@@ -109,14 +109,18 @@ export default function App() {
       artist: `Binaural Beats Generator${timerText}`,
       album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
       artwork: [
-        { src: 'icon512x512.png', sizes: '512x512', type: 'image/png' }
+        { src: `${window.location.origin}/icon512x512.png`, sizes: '512x512', type: 'image/png' }
       ]
     });
 
     if (playing) {
-      navigator.mediaSession.playbackState = 'playing';
       if (audioRef.current) {
-        audioRef.current.play().catch(console.error);
+        audioRef.current.volume = 0.01; // Tiny volume to satisfy some OS requirements
+        audioRef.current.play()
+          .then(() => {
+            navigator.mediaSession.playbackState = 'playing';
+          })
+          .catch(console.error);
       }
     } else {
       navigator.mediaSession.playbackState = 'paused';
@@ -493,6 +497,7 @@ export default function App() {
       <audio 
         ref={audioRef} 
         loop 
+        preload="auto"
         playsInline 
         title="Binaural Beats Background Sync"
         src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQyAFRTU0UAAAAPAAADTGF2ZTU3LjcxLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwPK8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkY3VzdG9tX2NvbW1lbnQAAABGRm1wZWcgdjU3LjcxLjEwMAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA" 
