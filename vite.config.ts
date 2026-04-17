@@ -15,7 +15,7 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         manifest: {
-          name: 'Binaural Beats Generator',
+          name: 'Binaural Beat Generator',
           short_name: 'Binaural',
           description: 'Precision binaural beat generator with dual frequency control, timers, and background playback.',
           theme_color: '#000000',
