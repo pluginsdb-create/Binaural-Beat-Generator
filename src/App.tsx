@@ -29,7 +29,6 @@ export default function App() {
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -98,50 +97,14 @@ export default function App() {
     return val;
   };
 
-  const syncMediaSession = useCallback((playing: boolean) => {
-    if (!('mediaSession' in navigator)) return;
-
-    const diff = Math.abs(parseFloat(leftFreq) - parseFloat(rightFreq)).toFixed(2);
-    const timerText = timerRemaining !== null ? ` | Timer: ${formatTime(timerRemaining)}` : '';
-
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: `Binaural Beat: ${diff} Hz`,
-      artist: `Binaural Beats Generator${timerText}`,
-      album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
-      artwork: [
-        { src: `${window.location.origin}/icon512x512.png`, sizes: '512x512', type: 'image/png' }
-      ]
-    });
-
-    if (playing) {
-      if (audioRef.current) {
-        // Explicitly set playing state before interaction to prime some systems
-        navigator.mediaSession.playbackState = 'playing';
-        audioRef.current.volume = 0.1; // Slightly higher but still negligible
-        audioRef.current.play()
-          .catch(err => {
-            console.error('Media Session Play Error:', err);
-            navigator.mediaSession.playbackState = 'paused';
-          });
-      }
-    } else {
-      navigator.mediaSession.playbackState = 'paused';
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    }
-  }, [leftFreq, rightFreq, timerRemaining]);
-
   const toggleLeft = () => {
     setActivePresetId(null);
     if (isPlayingLeft) {
       audioEngine.stopLeft();
       setIsPlayingLeft(false);
-      if (!isPlayingRight) syncMediaSession(false);
     } else {
       audioEngine.startLeft(parseFloat(leftFreq));
       setIsPlayingLeft(true);
-      syncMediaSession(true);
     }
   };
 
@@ -150,11 +113,9 @@ export default function App() {
     if (isPlayingRight) {
       audioEngine.stopRight();
       setIsPlayingRight(false);
-      if (!isPlayingLeft) syncMediaSession(false);
     } else {
       audioEngine.startRight(parseFloat(rightFreq));
       setIsPlayingRight(true);
-      syncMediaSession(true);
     }
   };
 
@@ -165,7 +126,6 @@ export default function App() {
       audioEngine.start(parseFloat(leftFreq), parseFloat(rightFreq));
       setIsPlayingLeft(true);
       setIsPlayingRight(true);
-      syncMediaSession(true);
     }
   };
 
@@ -200,35 +160,33 @@ export default function App() {
     setIsPlayingRight(false);
     setActivePresetId(null);
     clearTimer();
-    syncMediaSession(false);
-  }, [syncMediaSession]);
+  }, []);
 
-  // Media Session Handlers
+  // Media Session API for background control and notification
   useEffect(() => {
     if ('mediaSession' in navigator) {
+      const diff = Math.abs(parseFloat(leftFreq) - parseFloat(rightFreq)).toFixed(2);
+      const timerText = timerRemaining !== null ? ` | Timer: ${formatTime(timerRemaining)}` : '';
+      
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `Binaural Beat: ${diff} Hz`,
+        artist: `Binaural Beats Generator${timerText}`,
+        album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
+        artwork: [
+          { src: 'icon512x512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
       navigator.mediaSession.setActionHandler('play', () => {
         audioEngine.start(parseFloat(leftFreq), parseFloat(rightFreq));
         setIsPlayingLeft(true);
         setIsPlayingRight(true);
-        syncMediaSession(true);
       });
+
       navigator.mediaSession.setActionHandler('pause', stopAll);
       navigator.mediaSession.setActionHandler('stop', stopAll);
-
-      // Some Android versions require these to show notification controls reliably
-      navigator.mediaSession.setActionHandler('seekbackward', null);
-      navigator.mediaSession.setActionHandler('seekforward', null);
-      navigator.mediaSession.setActionHandler('previoustrack', null);
-      navigator.mediaSession.setActionHandler('nexttrack', null);
     }
-  }, [leftFreq, rightFreq, stopAll, syncMediaSession]);
-
-  // Update Media Metadata when freq or timer changes
-  useEffect(() => {
-    if (isPlayingLeft || isPlayingRight) {
-      syncMediaSession(true);
-    }
-  }, [leftFreq, rightFreq, timerRemaining, isPlayingLeft, isPlayingRight, syncMediaSession]);
+  }, [leftFreq, rightFreq, stopAll, timerRemaining]);
 
   // Update frequencies in real-time if playing
   useEffect(() => {
@@ -494,16 +452,6 @@ export default function App() {
 
       <footer className="w-full text-center py-8 text-[10px] text-gray-600 font-mono uppercase tracking-widest">
       </footer>
-
-      {/* Hidden audio element to trigger system media controls (Android/iOS) */}
-      <audio 
-        ref={audioRef} 
-        loop 
-        preload="auto"
-        playsInline 
-        title="Binaural Beats Background Sync"
-        src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQyAFRTU0UAAAAPAAADTGF2ZTU3LjcxLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwPK8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkY3VzdG9tX2NvbW1lbnQAAABGRm1wZWcgdjU3LjcxLjEwMAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA" 
-      />
     </div>
   );
 }
