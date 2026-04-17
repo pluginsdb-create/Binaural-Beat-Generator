@@ -98,14 +98,44 @@ export default function App() {
     return val;
   };
 
+  const syncMediaSession = useCallback((playing: boolean) => {
+    if (!('mediaSession' in navigator)) return;
+
+    const diff = Math.abs(parseFloat(leftFreq) - parseFloat(rightFreq)).toFixed(2);
+    const timerText = timerRemaining !== null ? ` | Timer: ${formatTime(timerRemaining)}` : '';
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: `Binaural Beat: ${diff} Hz`,
+      artist: `Binaural Beats Generator${timerText}`,
+      album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
+      artwork: [
+        { src: 'icon512x512.png', sizes: '512x512', type: 'image/png' }
+      ]
+    });
+
+    if (playing) {
+      navigator.mediaSession.playbackState = 'playing';
+      if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
+      }
+    } else {
+      navigator.mediaSession.playbackState = 'paused';
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
+  }, [leftFreq, rightFreq, timerRemaining]);
+
   const toggleLeft = () => {
     setActivePresetId(null);
     if (isPlayingLeft) {
       audioEngine.stopLeft();
       setIsPlayingLeft(false);
+      if (!isPlayingRight) syncMediaSession(false);
     } else {
       audioEngine.startLeft(parseFloat(leftFreq));
       setIsPlayingLeft(true);
+      syncMediaSession(true);
     }
   };
 
@@ -114,9 +144,11 @@ export default function App() {
     if (isPlayingRight) {
       audioEngine.stopRight();
       setIsPlayingRight(false);
+      if (!isPlayingLeft) syncMediaSession(false);
     } else {
       audioEngine.startRight(parseFloat(rightFreq));
       setIsPlayingRight(true);
+      syncMediaSession(true);
     }
   };
 
@@ -127,6 +159,7 @@ export default function App() {
       audioEngine.start(parseFloat(leftFreq), parseFloat(rightFreq));
       setIsPlayingLeft(true);
       setIsPlayingRight(true);
+      syncMediaSession(true);
     }
   };
 
@@ -161,48 +194,35 @@ export default function App() {
     setIsPlayingRight(false);
     setActivePresetId(null);
     clearTimer();
-  }, []);
+    syncMediaSession(false);
+  }, [syncMediaSession]);
 
-  // Media Session API for background control and notification
+  // Media Session Handlers
   useEffect(() => {
     if ('mediaSession' in navigator) {
-      const diff = Math.abs(parseFloat(leftFreq) - parseFloat(rightFreq)).toFixed(2);
-      const timerText = timerRemaining !== null ? ` | Timer: ${formatTime(timerRemaining)}` : '';
-      const isAnyPlaying = isPlayingLeft || isPlayingRight;
-
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: `Binaural Beat: ${diff} Hz`,
-        artist: `Binaural Beats Generator${timerText}`,
-        album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
-        artwork: [
-          { src: 'icon512x512.png', sizes: '512x512', type: 'image/png' }
-        ]
-      });
-
-      // Update playback state for Android/iOS system UI
-      navigator.mediaSession.playbackState = isAnyPlaying ? 'playing' : 'paused';
-
-      // Sync hidden audio element for background stay-awake and notification
-      if (audioRef.current) {
-        if (isAnyPlaying) {
-          audioRef.current.play().catch(() => {
-            // Auto-play might be blocked until user interaction
-          });
-        } else {
-          audioRef.current.pause();
-        }
-      }
-
       navigator.mediaSession.setActionHandler('play', () => {
         audioEngine.start(parseFloat(leftFreq), parseFloat(rightFreq));
         setIsPlayingLeft(true);
         setIsPlayingRight(true);
+        syncMediaSession(true);
       });
-
       navigator.mediaSession.setActionHandler('pause', stopAll);
       navigator.mediaSession.setActionHandler('stop', stopAll);
+
+      // Some Android versions require these to show notification controls reliably
+      navigator.mediaSession.setActionHandler('seekbackward', null);
+      navigator.mediaSession.setActionHandler('seekforward', null);
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      navigator.mediaSession.setActionHandler('nexttrack', null);
     }
-  }, [leftFreq, rightFreq, stopAll, timerRemaining, isPlayingLeft, isPlayingRight]);
+  }, [leftFreq, rightFreq, stopAll, syncMediaSession]);
+
+  // Update Media Metadata when freq or timer changes
+  useEffect(() => {
+    if (isPlayingLeft || isPlayingRight) {
+      syncMediaSession(true);
+    }
+  }, [leftFreq, rightFreq, timerRemaining, isPlayingLeft, isPlayingRight, syncMediaSession]);
 
   // Update frequencies in real-time if playing
   useEffect(() => {
@@ -475,7 +495,7 @@ export default function App() {
         loop 
         playsInline 
         title="Binaural Beats Background Sync"
-        src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" 
+        src="data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQyAFRTU0UAAAAPAAADTGF2ZTU3LjcxLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwPK8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8vKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkY3VzdG9tX2NvbW1lbnQAAABGRm1wZWcgdjU3LjcxLjEwMAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFNRTMuOTlyAc0AAAAAAAAAAL8BAAAAAAAAAAAAAAAAAAAA" 
       />
     </div>
   );
