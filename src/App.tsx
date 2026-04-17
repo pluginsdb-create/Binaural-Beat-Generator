@@ -170,7 +170,7 @@ export default function App() {
       
       navigator.mediaSession.metadata = new MediaMetadata({
         title: `Binaural Beat: ${diff} Hz`,
-        artist: `Binaural Beats Generator${timerText}`,
+        artist: `Binaural Beat Generator${timerText}`,
         album: `L: ${leftFreq}Hz | R: ${rightFreq}Hz`,
         artwork: [
           { src: 'icon512x512.png', sizes: '512x512', type: 'image/png' }
